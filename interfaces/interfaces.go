@@ -7,7 +7,7 @@ import (
 )
 
 type DB interface {
-	New(uri, dbType string) error
+	New(uri string, timeout time.Duration) error
 	Get(ctx context.Context, q string, args ...any) (*sql.Rows, error)
 	Exec(ctx context.Context, q string, args ...any) error
 	Init(timeout time.Duration) error

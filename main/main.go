@@ -11,6 +11,7 @@ import (
 	"mis-catanddog/lg"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 )
@@ -40,7 +41,17 @@ func main() {
 	switch config.Cfg.DB.Type {
 	case "sqlite":
 		db = &database.SqLiteDB{}
-		err = db.New(config.Cfg.DB.Uri, config.Cfg.DB.Type)
+		u, err := url.ParseRequestURI(config.Cfg.DB.Uri)
+		if err != nil {
+			lg.Logger.Error(fmt.Errorf("failed to parce uri: %w", err).Error())
+			os.Exit(1)
+		}
+		_, err = os.Stat(u.Path)
+		if err != nil {
+			lg.Logger.Error(fmt.Errorf("sqlite db file does not exist: %w", err).Error())
+			os.Exit(1)
+		}
+		err = db.New(config.Cfg.DB.Uri, time.Duration(config.Cfg.DB.Timeout)*time.Millisecond)
 		if err != nil {
 			lg.Logger.Error(fmt.Errorf("database connection error: %w", err).Error())
 			os.Exit(1)

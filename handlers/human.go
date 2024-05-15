@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/google/uuid"
+	"io"
 	"log/slog"
 	"mis-catanddog/config"
 	"mis-catanddog/interfaces"
@@ -85,21 +86,37 @@ func getHumanSearch(ctx context.Context, w http.ResponseWriter, r *http.Request,
 	}
 
 	// parse result
-	id, docType := make([]int, 0), make([]string, 0)
+	i := 0
+	result := ""
 	for qResult.Next() {
-		var doc_id, firsst_name, middle_name, last_name string
+		i++
+		var doc_id, firsst_name, middle_name, last_name, birth_date string
 		var doc_type int
-		var birth_date time.Time
 		if err := qResult.Scan(&doc_id, &doc_type, &firsst_name, &middle_name, &last_name, &birth_date); err != nil {
 			l.Error(fmt.Errorf("cannot read query result %w", err).Error())
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
+		l.Debug(fmt.Sprintf("DB query result %d", i), "doc_id", doc_id, "firsst_name", firsst_name, "middle_name", middle_name,
+			"last_name", last_name, "doc_type", doc_type, "birth_date", birth_date)
+		result += fmt.Sprintf("{ \"doc_id\":\"%s\", \"doc_type\":\"%d\", \"firsst_name\":\"%s\", \"middle_name\":\"%s\", \"last_name\":\"%s\", \"birth_date\":\"%s\"},", doc_id, doc_type, firsst_name, middle_name, last_name, birth_date)
 	}
 	if qResult.Err() != nil {
 		l.Debug("query result", "error", qResult.Err().Error())
 	}
-	l.Debug("query result", "id", id, "doc_type", docType)
+	if i > 0 {
+		result = result[:len(result)-1]
+	} else {
+		l.Debug("DB query yielded no result")
+		result = "{}"
+	}
+	// return to caller
+	w.Header().Set("Content-Type", "application/json")
+	if _, err = io.WriteString(w, result); err != nil {
+		l.Error(fmt.Errorf("cannot write responce to caller: %w", err).Error())
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 }
 
 func prepSearchQuery(u *url.URL) (query string, args []any, err error) {
@@ -118,5 +135,5 @@ func prepSearchQuery(u *url.URL) (query string, args []any, err error) {
 		return result, a, nil
 	}
 	// handle complex search that yields multiple result
-	return "", nil, nil
+	return "", nil, fmt.Errorf("stub error")
 }

@@ -1,6 +1,6 @@
 db:
   type: "sqlite" #pgsql, sqlite
-  uri: 'file:E:\GoProjects\learning\mis-catanddog\database\db.sqlite'#"postgresql://user:secret@host:5432/database"
+  uri: 'file:/home/default/GolandProjects/mis-catanddog/database/db.sqlite'#"postgresql://user:secret@host:5432/database"
   timeout: 1000
   initDB: false
 web:

@@ -15,12 +15,19 @@ type SqLiteDB struct {
 }
 
 // New initializes DB connection
-func (s *SqLiteDB) New(uri, dbType string) error {
+func (s *SqLiteDB) New(uri string, timeout time.Duration) error {
 	var err error
 
 	s.db, err = sql.Open("sqlite3", uri)
 	if err != nil {
-		return fmt.Errorf("failed to connect to sqlite database: %w", err)
+		return fmt.Errorf("failed to create db object: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	err = s.db.PingContext(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to ping database: %w", err)
 	}
 
 	return nil
