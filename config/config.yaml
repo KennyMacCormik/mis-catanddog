@@ -1,0 +1,11 @@
+db:
+  type: "sqlite" #pgsql, sqlite
+  uri: 'file:E:\GoProjects\learning\mis-catanddog\database\db.sqlite'#"postgresql://user:secret@host:5432/database"
+  timeout: 1000
+  initDB: false
+web:
+  timeout: 4000
+  idleTimeout: 60000
+log:
+  level: "debug"
+  format: "text"
