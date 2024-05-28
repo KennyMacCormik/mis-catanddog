@@ -81,10 +81,10 @@ func main() {
 			return context.WithValue(context.TODO(), "DB", db)
 		}, // Cant find parent context in documentation
 	}
-	//http.HandleFunc("/doc_type", handlers.DocType)
+	http.HandleFunc("/doc_type", handlers.DocType)
 	//http.HandleFunc("/animal_type", handlers.AnimalType)
-	http.HandleFunc("GET /human/{$}", handlers.HumanSearch)
-	http.HandleFunc("/human/id/{id}/{$}", handlers.HumanId)
+	//http.HandleFunc("GET /human/{$}", handlers.HumanSearch)
+	//http.HandleFunc("/human/id/{id}/{$}", handlers.HumanId)
 	lg.Logger.Info("Starting server")
 	err = server.ListenAndServe()
 	if err != nil {

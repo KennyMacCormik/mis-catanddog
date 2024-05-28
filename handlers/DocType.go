@@ -6,7 +6,6 @@ package handlers
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
@@ -16,7 +15,6 @@ import (
 	"mis-catanddog/interfaces"
 	"mis-catanddog/lg"
 	"net/http"
-	"strconv"
 	"sync"
 	"time"
 )
@@ -35,98 +33,16 @@ func DocType(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		getDocType(r.Context(), w, r, log, db)
-	case http.MethodPost:
-		postDocType(r.Context(), w, r, log, db)
-	case http.MethodDelete:
-		deleteDocType(r.Context(), w, r, log, db)
-	case http.MethodPut, http.MethodPatch:
-		updateDocType(r.Context(), w, r, log, db)
+	/*
+		case http.MethodPost:
+				postDocType(r.Context(), w, r, log, db)
+		case http.MethodDelete:
+			deleteDocType(r.Context(), w, r, log, db)
+		case http.MethodPut, http.MethodPatch:
+			updateDocType(r.Context(), w, r, log, db)
+	*/
 	default:
 		log.Error(fmt.Sprintf("unexpected method %s", r.Method))
-	}
-}
-
-func getDocType(ctx context.Context, w http.ResponseWriter, r *http.Request, l *slog.Logger, db interfaces.DB) {
-	// validate query
-	q := r.URL.Query()
-	valDoc, okDoc := q["doc"]
-	valId, okId := q["id"]
-	if (!okDoc && !okId) || (okDoc && okId) {
-		l.Error("ambiguous query. 'doc' and 'id' either together or not present", "query", q)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	var val []string
-	if okDoc {
-		val = valDoc
-	} else {
-		val = valId
-	}
-	l.Debug("query content", "val", val)
-
-	if len(val) > 1 {
-		l.Error(fmt.Sprintf("unexpected number of '%s' queries", val[0]), "query", val)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	res := val[0]
-
-	// execute query
-	dbCtx, cancel := context.WithTimeout(ctx, time.Duration(config.Cfg.DB.Timeout)*time.Millisecond)
-	defer cancel()
-	var qResult *sql.Rows
-	var err error
-	if okDoc {
-		qResult, err = db.Get(dbCtx, "SELECT id, doc from doc_type WHERE doc=?", res)
-	} else {
-		qResult, err = db.Get(dbCtx, "SELECT id, doc from doc_type WHERE id=?", res)
-	}
-	if err != nil {
-		l.Error(fmt.Errorf("bad request: %w", err).Error())
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	defer qResult.Close()
-	if qResult.Err() != nil {
-		l.Debug("query result", "error", qResult.Err().Error())
-	}
-
-	// parse result
-	id, docType := make([]int, 0), make([]string, 0)
-	for qResult.Next() {
-		var s string
-		var i int
-		if err := qResult.Scan(&i, &s); err != nil {
-			l.Error(fmt.Errorf("cannot read query result %w", err).Error())
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		id = append(id, i)
-		docType = append(docType, s)
-	}
-	if qResult.Err() != nil {
-		l.Debug("query result", "error", qResult.Err().Error())
-	}
-	l.Debug("query result", "id", id, "doc_type", docType)
-
-	// prep return value
-	tmpLen := len(id)
-	returnJson := "{"
-	for i := 0; i < tmpLen; i++ {
-		returnJson += strconv.Itoa(id[i]) + ":" + docType[i] + ","
-	}
-	if returnJson != "{" {
-		returnJson = returnJson[:len(returnJson)-1]
-	}
-	returnJson += "}"
-
-	// return to caller
-	w.Header().Set("Content-Type", "application/json")
-	if _, err = io.WriteString(w, returnJson); err != nil {
-		l.Error(fmt.Errorf("cannot write responce to caller: %w", err).Error())
-		w.WriteHeader(http.StatusBadRequest)
-		return
 	}
 }
 
