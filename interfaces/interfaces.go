@@ -11,5 +11,5 @@ type DB interface {
 	Get(ctx context.Context, q string, args ...any) (*sql.Rows, error)
 	Exec(ctx context.Context, q string, args ...any) error
 	Init(timeout time.Duration) error
-	Close()
+	Close() error
 }
