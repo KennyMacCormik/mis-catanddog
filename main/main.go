@@ -4,19 +4,24 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"mis-catanddog/config"
-	"mis-catanddog/database"
-	"mis-catanddog/handlers"
-	"mis-catanddog/interfaces"
+	"mis-catanddog/handlers/DocType"
 	"mis-catanddog/lg"
+	"mis-catanddog/repos"
+	"mis-catanddog/repos/sqlite3"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"time"
 )
 
 func main() {
+	var db repos.DB
+	var cfg config.Config
+	var logg *slog.Logger
 	log.Default().SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 
 	// read config
@@ -24,83 +29,74 @@ func main() {
 	if err != nil {
 		log.Fatal(fmt.Errorf("config path error: %w", err))
 	}
-	if err := config.Cfg.New(path); err != nil {
+	if err := cfg.New(path); err != nil {
 		log.Fatal(fmt.Errorf("reading config file: %w", err))
 	}
 
 	// init logger
-	lg.Logger, err = lg.Init(config.Cfg.Log.Format, config.Cfg.Log.Level)
+	logg, err = lg.Init(cfg.Log.Format, cfg.Log.Level)
 	if err != nil {
 		log.Fatal(fmt.Errorf("logger init error: %w", err))
 	}
 
-	lg.Logger.Debug(fmt.Sprintf("Config: %+v", config.Cfg))
+	logg.Debug(fmt.Sprintf("Config: %+v", cfg))
 
 	// create DB connection
-	var db interfaces.DB
-	switch config.Cfg.DB.Type {
-	case "sqlite":
-		db = &database.SqLiteDB{}
-		u, err := url.ParseRequestURI(config.Cfg.DB.Uri)
-		if err != nil {
-			lg.Logger.Error(fmt.Errorf("failed to parce uri: %w", err).Error())
-			os.Exit(1)
-		}
-		_, err = os.Stat(u.Path)
-		if err != nil {
-			lg.Logger.Error(fmt.Errorf("sqlite db file does not exist: %w", err).Error())
-			os.Exit(1)
-		}
-		err = db.New(config.Cfg.DB.Uri, time.Duration(config.Cfg.DB.Timeout)*time.Millisecond)
-		if err != nil {
-			lg.Logger.Error(fmt.Errorf("database connection error: %w", err).Error())
-			os.Exit(1)
-		}
-		defer db.Close()
-		lg.Logger.Info("DB connection successful")
-	case "pgsql":
-		lg.Logger.Error("not yet implemented")
-		os.Exit(1)
-	default:
-		lg.Logger.Error("unexpected db type")
+	db = initRepo(cfg, logg)
+	if db == nil {
 		os.Exit(1)
 	}
-
-	// init DB if empty
-	initDB(db)
+	defer db.Close()
 
 	// init server
 	server := &http.Server{
-		Addr:           ":8080",
+		Addr:           ":" + strconv.Itoa(cfg.Web.Port),
 		Handler:        nil,
-		ReadTimeout:    time.Duration(config.Cfg.Web.Timeout) * time.Millisecond,
-		WriteTimeout:   time.Duration(config.Cfg.Web.Timeout) * time.Millisecond,
-		IdleTimeout:    time.Duration(config.Cfg.Web.IdleTimeout) * time.Millisecond,
+		ReadTimeout:    time.Duration(cfg.Web.Timeout) * time.Millisecond,
+		WriteTimeout:   time.Duration(cfg.Web.Timeout) * time.Millisecond,
+		IdleTimeout:    time.Duration(cfg.Web.IdleTimeout) * time.Millisecond,
 		MaxHeaderBytes: 1 << 20, // 1Mb
 		BaseContext: func(l net.Listener) context.Context {
-			return context.WithValue(context.TODO(), "DB", db)
-		}, // Cant find parent context in documentation
+			// Cant find parent context in documentation
+			ctx := context.WithValue(context.TODO(), "db", db)
+			return context.WithValue(ctx, "logger", logg)
+		},
 	}
-	http.HandleFunc("/doc_type", handlers.DocType)
-	//http.HandleFunc("/animal_type", handlers.AnimalType)
-	//http.HandleFunc("GET /human/{$}", handlers.HumanSearch)
-	//http.HandleFunc("/human/id/{id}/{$}", handlers.HumanId)
-	lg.Logger.Info("Starting server")
+	http.HandleFunc("/doc_type", DocType.DocType)
+
+	logg.Info("Starting server")
 	err = server.ListenAndServe()
 	if err != nil {
-		lg.Logger.Error(fmt.Errorf("web server failed: %w", err).Error())
+		logg.Error(fmt.Errorf("web server failed: %w", err).Error())
 		os.Exit(1)
 	}
 }
 
-func initDB(db interfaces.DB) {
-	if config.Cfg.DB.InitDB {
-		if err := db.Init(time.Duration(config.Cfg.DB.Timeout)); err != nil {
-			lg.Logger.Error(fmt.Errorf("failed to init DB: %w", err).Error())
-			os.Exit(1)
+func initRepo(cfg config.Config, l *slog.Logger) repos.DB {
+	switch cfg.DB.Type {
+	case "sqlite":
+		var db repos.DB = &sqlite3.SqLiteDB{}
+		u, err := url.ParseRequestURI(cfg.DB.Uri)
+		if err != nil {
+			l.Error(fmt.Errorf("failed to parce uri: %w", err).Error())
+			return nil
 		}
-		lg.Logger.Info("DB init successful")
-	} else {
-		lg.Logger.Debug("DB init disabled")
+		_, err = os.Stat(u.Opaque)
+		if err != nil {
+			l.Error(fmt.Errorf("sqlite db file does not exist: %w", err).Error())
+			return nil
+		}
+		err = db.New(cfg.DB.Uri, time.Duration(cfg.DB.Timeout)*time.Millisecond)
+		if err != nil {
+			l.Error(fmt.Errorf("repos connection error: %w", err).Error())
+			return nil
+		}
+		return db
+	case "pgsql":
+		l.Error("not yet implemented")
+		return nil
+	default:
+		l.Error("unexpected db type")
+		return nil
 	}
 }

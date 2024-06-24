@@ -8,16 +8,15 @@ import (
 	"slices"
 )
 
-var Cfg Config
-
 type Config struct {
 	DB struct {
 		Type    string `yaml:"type" env-default:"sqlite" env-description:"Database type. Allowed pgsql, sqlite" validate:"required,oneof=pgsql sqlite"`
-		Uri     string `yaml:"uri" env-required:"true" env-description:"Database URI. Example postgresql://user:secret@host:5432/database" validate:"required,uri"`
+		Uri     string `yaml:"uri" env-required:"true" env-description:"Database URI. Example postgresql://user:secret@host:5432/repos" validate:"required,uri"`
 		Timeout int    `yaml:"timeout" env-default:"1000" env-description:"Timeout for an SQL query" validate:"required,number,gt=0"`
 		InitDB  bool   `yaml:"initDB" env-default:"false" env-description:"Init DB with default schema"`
 	} `yaml:"db"`
 	Web struct {
+		Port        int `yaml:"port" env-default:"8080" env-description:"default server port" validate:"required,number,gt=79"`
 		Timeout     int `yaml:"timeout" env-default:"4000" env-description:"Connection timeout" validate:"required,number,gt=0"`
 		IdleTimeout int `yaml:"idleTimeout" env-default:"60000" env-description:"Idle connection timeout" validate:"required,number,gt=0"`
 	} `yaml:"web"`

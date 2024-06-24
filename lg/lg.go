@@ -6,8 +6,6 @@ import (
 	"os"
 )
 
-var Logger *slog.Logger
-
 func Init(format, level string) (*slog.Logger, error) {
 	var levelMap = map[string]slog.Level{
 		"debug": -4,

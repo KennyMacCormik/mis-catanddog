@@ -1,37 +1,10 @@
-package database
+package sqlite3
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
-	_ "github.com/mattn/go-sqlite3"
-	"sync"
 	"time"
 )
-
-type SqLiteDB struct {
-	db *sql.DB
-	m  sync.Mutex // sqlite poorly handles simultaneous writes
-}
-
-// New initializes DB connection
-func (s *SqLiteDB) New(uri string, timeout time.Duration) error {
-	var err error
-
-	s.db, err = sql.Open("sqlite3", uri)
-	if err != nil {
-		return fmt.Errorf("failed to create db object: %w", err)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	err = s.db.PingContext(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to ping database: %w", err)
-	}
-
-	return nil
-}
 
 // Init tries to create necessary tables if they don't exist
 func (s *SqLiteDB) Init(timeout time.Duration) error {
@@ -73,56 +46,5 @@ func (s *SqLiteDB) ForceInitDictTables(timeout time.Duration) error {
 		}
 	}
 
-	return nil
-}
-
-// Get runs SELECT queries
-func (s *SqLiteDB) Get(ctx context.Context, q string, args ...any) (*sql.Rows, error) {
-	if q[:6] != "SELECT" {
-		return nil, fmt.Errorf("query %s is not a SELECT query", q)
-	}
-	result, err := s.db.QueryContext(ctx, q, args...)
-	if err != nil {
-		return nil, fmt.Errorf("failed query: %w", err)
-	}
-	return result, nil
-}
-
-// Exec runs query in transaction and does not return any result
-func (s *SqLiteDB) Exec(ctx context.Context, q string, args ...any) error {
-	s.m.Lock()
-	defer s.m.Unlock()
-
-	// begin transaction
-	tx, err := s.db.BeginTx(ctx, nil)
-	defer tx.Rollback()
-	if err != nil {
-		return fmt.Errorf("failed to init transaction: %w", err)
-	}
-
-	// prepare statement ot exec
-	stmt, err := tx.Prepare(q)
-	if err != nil {
-		return fmt.Errorf("failed to prepare query %s: %w", q, err)
-	}
-	defer stmt.Close()
-
-	// exec statement
-	if _, err := stmt.Exec(args...); err != nil {
-		return fmt.Errorf("failed query [%s]. Rolling back: %w", q, err)
-	}
-
-	// commit a transaction
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit a transaction: %w", err)
-	}
-	return nil
-}
-
-// Close closes DB connection
-func (s *SqLiteDB) Close() error {
-	if err := s.db.Close(); err != nil {
-		return fmt.Errorf("error closing a connectin: %w", err)
-	}
 	return nil
 }
