@@ -24,6 +24,6 @@ func Init(format, level string) (*slog.Logger, error) {
 		l := slog.New(h)
 		return l, nil
 	default:
-		return nil, fmt.Errorf("unexpected log format %s. Expected: text, json", format)
+		return nil, fmt.Errorf("unexpecteed log format %s. Expected: text, json", format)
 	}
 }
